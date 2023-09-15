@@ -1,11 +1,25 @@
+import os
 import subprocess
 import sys
 import webbrowser
 
 import pandas as pd
-import speech_recognition as sr
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QFileDialog, QTextEdit
+from speechkit import configure_credentials, creds
+from speechkit import model_repository
+from speechkit.stt import AudioProcessingType
 
+configure_credentials(
+    yandex_credentials=creds.YandexCredentials(
+        api_key='AQVN3rbmbMzfLQr1qSKWwxFX4clHGFVieh-iCtjy'
+    )
+)
+
+model = model_repository.recognition_model()
+
+model.model = 'general:rc'
+model.language = 'ru-RU'
+model.audio_processing_type = AudioProcessingType.Full
 
 class TreeRecognitionApp(QMainWindow):
     def __init__(self):
@@ -51,16 +65,20 @@ class TreeRecognitionApp(QMainWindow):
     def run_audio_recognition(self):
         audio_file, _ = QFileDialog.getOpenFileName(self, "Open Audio File", "", "Audio Files (*.mp3 *.wav)")
 
-        recognizer = sr.Recognizer()
+        # Имя папки для создания файла с результатами
+        folder_name = os.path.basename(audio_file)
+        file_name_without_extension = os.path.splitext(folder_name)[0]  # Имя файла без расширения
+        output_file_path = os.path.join(os.path.dirname(audio_file), f'{file_name_without_extension}.txt')
 
-        with sr.AudioFile(audio_file) as source:
-            audio_data = recognizer.record(source)
-            try:
-                text = recognizer.recognize_google(audio_data, language="ru-RU")
-            except sr.UnknownValueError:
-                print("Речь не распознана")
-            except sr.RequestError as e:
-                print("Ошибка при выполнении запроса к сервису Google: {0}".format(e))
+        # Откройте или создайте файл для добавления результатов
+        output_file = open(output_file_path, 'a', encoding='utf-8')
+
+        result = model.transcribe_file(audio_file)
+
+        for c, res in enumerate(result):
+            if c == 1:
+                output_file.write(f'{res.normalized_text}\n\n')
+                text = f'{res.normalized_text}\n\n'
 
         result_text = "Распознанный текст: " + text + '\n' + recognize(text)
         self.text_edit.clear()
@@ -160,7 +178,6 @@ def recognize(text):
         file.write(codes_str + data)
 
     return codes_str
-
 
 def main():
     app = QApplication(sys.argv)
